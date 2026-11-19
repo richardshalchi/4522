@@ -1,0 +1,1369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Feed Simulation - Research Study</title>
+<style>
+  :root {
+    --bg-color: #000;
+    --card-bg: #111;
+    --accent: #fe2c55;
+    --dislike-accent: #3a86ff;
+    --text: #fff;
+    --glass-bg: rgba(22, 22, 22, 0.85);
+    --glass-border: rgba(255, 255, 255, 0.15);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  body { background-color: #121212; color: var(--text); display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+  
+  /* Setup Screen */
+  #setup-screen { background: #1e1e1e; padding: 30px; border-radius: 12px; width: 100%; max-width: 420px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+  #setup-screen h2 { margin-bottom: 20px; text-align: center; color: #fff; }
+  .form-group { margin-bottom: 15px; }
+  .form-group label { display: block; margin-bottom: 5px; font-size: 14px; color: #bbb; }
+  .form-group input, .form-group select { width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #333; background: #2a2a2a; color: #fff; font-size: 16px; }
+  button.btn-primary { width: 100%; padding: 12px; border: none; border-radius: 6px; background: var(--accent); color: white; font-weight: bold; font-size: 16px; cursor: pointer; margin-top: 10px; }
+  button.btn-primary:hover { opacity: 0.9; }
+  button.btn-secondary { width: 100%; padding: 10px; border: 1px solid #444; border-radius: 6px; background: #2a2a2a; color: #ddd; font-weight: 600; font-size: 14px; cursor: pointer; margin-top: 10px; }
+  button.btn-secondary:hover { background: #333; }
+
+  /* Feed Container */
+  #app-container { display: none; width: 100%; max-width: 400px; height: 750px; background: var(--bg-color); border-radius: 16px; overflow: hidden; position: relative; border: 2px solid #333; }
+  
+  /* Header Bar with Timer, End Block, and Reload Button */
+  .header-bar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 48px;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.88), transparent);
+    z-index: 10;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 12px;
+    gap: 8px;
+  }
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .timer-pill {
+    background: rgba(0, 0, 0, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    color: #eee;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 9px;
+    border-radius: 999px;
+    font-variant-numeric: tabular-nums;
+  }
+  .end-block-btn {
+    background: rgba(254, 44, 85, 0.22);
+    border: 1px solid rgba(254, 44, 85, 0.65);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 5px 10px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .end-block-btn:hover {
+    background: var(--accent);
+  }
+  .refresh-btn {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 18px;
+    cursor: pointer;
+    padding: 5px;
+    opacity: 0.8;
+    transition: opacity 0.2s;
+  }
+  .refresh-btn:hover { opacity: 1; }
+
+  /* Video Deck */
+  .feed-viewport { width: 100%; height: 100%; overflow: hidden; position: relative; }
+  .video-card { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; background: #000; }
+  video { width: 100%; height: 100%; object-fit: cover; cursor: pointer; }
+
+  /* Action Buttons (Right Overlay) */
+  .ui-overlay { 
+    position: absolute; 
+    right: 12px; 
+    bottom: 85px; 
+    display: flex; 
+    flex-direction: column; 
+    gap: 14px; 
+    z-index: 5; 
+    align-items: center; 
+  }
+  
+  /* Profile Avatar Follow Button */
+  .profile-btn {
+    position: relative;
+    width: 48px;
+    height: 48px;
+    margin-bottom: 8px;
+    cursor: pointer;
+  }
+  .profile-avatar {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: #333;
+    border: 2px solid #fff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 22px;
+    overflow: hidden;
+  }
+  .follow-badge {
+    position: absolute;
+    bottom: -6px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--accent);
+    color: white;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 12px;
+    font-weight: bold;
+    border: 2px solid #000;
+    transition: all 0.2s ease;
+  }
+  .profile-btn.is-following .follow-badge {
+    background: #2ec4b6;
+  }
+  .profile-btn.is-following .profile-avatar {
+    border-color: #2ec4b6;
+  }
+
+  /* Standard Action Buttons */
+  .action-btn { background: rgba(0,0,0,0.45); border: none; color: white; width: 46px; height: 46px; border-radius: 50%; display: flex; flex-direction: column; justify-content: center; align-items: center; cursor: pointer; font-size: 16px; backdrop-filter: blur(5px); }
+  .action-btn.active-like { color: var(--accent); }
+  .action-btn.active-dislike { color: var(--dislike-accent); }
+  .action-btn.active-generic { color: #ffd166; }
+  .action-btn span { font-size: 8px; margin-top: 2px; }
+
+  /* Metadata Text */
+  .video-info { 
+    position: absolute; 
+    bottom: 65px; 
+    left: 0; 
+    right: 0; 
+    padding: 15px;
+    padding-right: 70px; 
+    z-index: 5; 
+    background: linear-gradient(to top, rgba(0,0,0,0.85), transparent); 
+    pointer-events: none;
+  }
+  .video-author {
+    font-size: 14px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 4px;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+  }
+  .video-info h4 { font-size: 14px; font-weight: 400; color: #eee; text-shadow: 0 1px 3px rgba(0,0,0,0.8); }
+
+  /* Bottom Navigation Bar */
+  .nav-controls { 
+    position: absolute; 
+    bottom: 0; 
+    left: 0; 
+    right: 0; 
+    height: 60px; 
+    background: rgba(0,0,0,0.95); 
+    display: flex; 
+    justify-content: space-around; 
+    align-items: center; 
+    z-index: 10; 
+    border-top: 1px solid #222;
+  }
+  .nav-btn { background: #222; border: 1px solid #444; color: white; font-weight: bold; cursor: pointer; padding: 8px 16px; border-radius: 20px; font-size: 12px; }
+  .nav-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* In-Feed Probe Modal Overlay */
+  #probe-modal {
+    display: none;
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    z-index: 30;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 24px;
+    text-align: center;
+  }
+  .probe-card {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    padding: 24px 18px;
+    width: 100%;
+    box-shadow: 0 12px 32px rgba(0,0,0,0.6);
+  }
+  .probe-card h3 {
+    font-size: 15px;
+    font-weight: 600;
+    color: #fff;
+    margin-bottom: 18px;
+    line-height: 1.4;
+  }
+  .likert-scale {
+    display: flex;
+    justify-content: space-between;
+    gap: 6px;
+    margin-bottom: 12px;
+  }
+  .likert-btn {
+    flex: 1;
+    padding: 12px 0;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    color: #fff;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .likert-btn:hover {
+    background: var(--accent);
+    border-color: var(--accent);
+    transform: translateY(-2px);
+  }
+  .likert-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: #aaa;
+    margin-top: 4px;
+  }
+
+  /* Comments Drawer Overlay */
+  #comments-drawer {
+    display: none;
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 450px;
+    background: rgba(18, 18, 18, 0.95);
+    backdrop-filter: blur(15px);
+    border-top-left-radius: 20px;
+    border-top-right-radius: 20px;
+    z-index: 40;
+    flex-direction: column;
+    border-top: 1px solid #333;
+    animation: slideUp 0.3s ease-out;
+  }
+  @keyframes slideUp {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+  .comments-header {
+    padding: 15px;
+    text-align: center;
+    font-weight: 600;
+    font-size: 14px;
+    border-bottom: 1px solid #2a2a2a;
+    position: relative;
+  }
+  .close-comments {
+    position: absolute;
+    right: 15px;
+    top: 15px;
+    background: none;
+    border: none;
+    color: #aaa;
+    font-size: 16px;
+    cursor: pointer;
+  }
+  .comments-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+  }
+  .comment-item {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+  }
+  .comment-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #333;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+  .comment-content {
+    flex: 1;
+    font-size: 13px;
+  }
+  .comment-user {
+    font-weight: 600;
+    color: #aaa;
+    margin-bottom: 2px;
+  }
+  .comment-text {
+    color: #eee;
+    line-height: 1.3;
+  }
+  .comment-like-btn {
+    background: none;
+    border: none;
+    color: #aaa;
+    cursor: pointer;
+    font-size: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 0 5px;
+  }
+  .comment-like-btn.liked {
+    color: var(--accent);
+  }
+
+  /* Share Modal Overlay */
+  #share-modal {
+    display: none;
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    background: rgba(22, 22, 22, 0.98);
+    border-top-left-radius: 20px;
+    border-top-right-radius: 20px;
+    z-index: 40;
+    padding: 25px 20px 40px 20px;
+    text-align: center;
+    border-top: 1px solid #333;
+    animation: slideUp 0.3s ease-out;
+  }
+  #share-modal h3 {
+    font-size: 15px;
+    margin-bottom: 20px;
+    color: #fff;
+  }
+  .share-options {
+    display: flex;
+    justify-content: space-around;
+    gap: 15px;
+  }
+  .share-option-btn {
+    background: #2a2a2a;
+    border: 1px solid #444;
+    color: white;
+    padding: 15px;
+    border-radius: 12px;
+    cursor: pointer;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    transition: background 0.2s, border-color 0.2s;
+  }
+  .share-option-btn:hover, .share-option-btn.selected {
+    background: #333;
+    border-color: var(--accent);
+  }
+  .share-option-btn span.icon {
+    font-size: 24px;
+  }
+  .cancel-share-btn {
+    margin-top: 20px;
+    background: none;
+    border: none;
+    color: #aaa;
+    font-size: 14px;
+    cursor: pointer;
+  }
+
+  /* End Screen */
+  #end-screen { display: none; text-align: center; background: #1e1e1e; padding: 30px; border-radius: 12px; max-width: 420px; width: 100%; }
+  #end-screen h2 { margin-bottom: 10px; }
+  #end-screen p { color: #aaa; margin-bottom: 14px; line-height: 1.45; }
+  #upload-status { font-size: 13px; padding: 10px 12px; border-radius: 8px; background: #272727; color: #ddd; margin-bottom: 16px; }
+</style>
+</head>
+<body>
+
+  <!-- Setup Screen -->
+  <div id="setup-screen">
+    <h2>Session Setup</h2>
+    <div class="form-group">
+      <label for="participant-id">Participant ID</label>
+      <input type="text" id="participant-id" placeholder="e.g., P01" value="P01">
+    </div>
+    <div class="form-group">
+      <label for="condition-select">Condition Block</label>
+      <select id="condition-select">
+        <option value="Aligned">A</option>
+        <option value="Misaligned">B</option>
+        <option value="Non-Responsive">C</option>
+      </select>
+    </div>
+    <button class="btn-primary" onclick="startSession()">Start Condition Block (7:00)</button>
+  </div>
+
+  <!-- Main Feed App -->
+  <div id="app-container">
+    <div class="header-bar">
+      <div class="header-left">
+        <div class="timer-pill" id="block-timer">07:00</div>
+        <button class="end-block-btn" onclick="endSession('manual_end_block')">End Block</button>
+      </div>
+      <button class="refresh-btn" onclick="refreshFeed()" title="Refresh Feed">🔄</button>
+    </div>
+
+    <!-- In-Feed Probe Modal -->
+    <div id="probe-modal">
+      <div class="probe-card">
+        <h3>How much are your actions shaping this feed right now?</h3>
+        <div class="likert-scale">
+          <button class="likert-btn" onclick="submitProbe(1)">1</button>
+          <button class="likert-btn" onclick="submitProbe(2)">2</button>
+          <button class="likert-btn" onclick="submitProbe(3)">3</button>
+          <button class="likert-btn" onclick="submitProbe(4)">4</button>
+          <button class="likert-btn" onclick="submitProbe(5)">5</button>
+          <button class="likert-btn" onclick="submitProbe(6)">6</button>
+          <button class="likert-btn" onclick="submitProbe(7)">7</button>
+        </div>
+        <div class="likert-labels">
+          <span>1 - Not at all</span>
+          <span>4 - Neutral</span>
+          <span>7 - Completely</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Comments Drawer -->
+    <div id="comments-drawer">
+      <div class="comments-header">
+        <span id="comments-title-count">Comments</span>
+        <button class="close-comments" onclick="closeComments()">✕</button>
+      </div>
+      <div class="comments-list" id="comments-list-container">
+        <!-- Dynamically injected comments -->
+      </div>
+    </div>
+
+    <!-- Share Modal -->
+    <div id="share-modal">
+      <h3>Share this video</h3>
+      <div class="share-options">
+        <button class="share-option-btn" id="btn-share-friends" onclick="executeShare('share_to_friends')">
+          <span class="icon">👥</span>
+          <span>Share to Friends</span>
+        </button>
+        <button class="share-option-btn" id="btn-repost" onclick="executeShare('repost_to_feed')">
+          <span class="icon">🔄</span>
+          <span>Repost to Feed</span>
+        </button>
+      </div>
+      <button class="cancel-share-btn" onclick="closeShareModal()">Cancel</button>
+    </div>
+
+    <div class="feed-viewport">
+      <div class="video-card" id="current-card">
+        <video id="feed-video" loop autoplay muted playsinline onclick="togglePlayPause()"></video>
+        
+        <div class="video-info">
+          <div class="video-author" id="video-author">@username</div>
+          <h4 id="video-title">Video Title</h4>
+        </div>
+
+        <div class="ui-overlay">
+          <div class="profile-btn" id="profile-btn" onclick="toggleFollow()">
+            <div class="profile-avatar">👤</div>
+            <div class="follow-badge" id="follow-badge">+</div>
+          </div>
+          <button class="action-btn" id="like-btn" onclick="toggleLike()">❤️ <span>Like</span></button>
+          <button class="action-btn" id="comment-btn" onclick="openComments()">💬 <span>Comments</span></button>
+          <button class="action-btn" id="dislike-btn" onclick="toggleDislike()">🚫 <span>Not Interested</span></button>
+          <button class="action-btn" id="save-btn" onclick="toggleSave()">🔖 <span>Save</span></button>
+          <button class="action-btn" id="share-btn" onclick="openShareModal()">🔗 <span>Share</span></button>
+        </div>
+      </div>
+    </div>
+
+    <div class="nav-controls">
+      <button class="nav-btn" id="prev-btn" onclick="prevVideo()" disabled>⬆️ Previous</button>
+      <button class="nav-btn" onclick="nextVideo()">Next ⬇️</button>
+    </div>
+  </div>
+
+  <!-- End Screen -->
+  <div id="end-screen">
+    <h2>Condition Block Complete</h2>
+    <p>Session data is being sent to the study cloud folder.</p>
+    <div id="upload-status">Preparing upload...</div>
+  </div>
+
+  <script>
+    // Replace with your deployed Google Apps Script Web App URL
+    const UPLOAD_ENDPOINT_URL = "https://script.google.com/macros/s/AKfycbx4GXqyzlqX7Dn_U7nKXvW8krtbrz-rf0giY-n3bAapjHJ3QVN35fFXjVixMpDtsaEXdg/exec";
+    const BLOCK_DURATION_SECONDS = 7 * 60; // 7 minutes
+
+    // Partitioned Video Subsets (1 to 100 with generalized titles for A, B, and C)
+    const videoSubsets = {
+      "Aligned": [
+        { id: 'A1', author: '@pet_lover', category: 'Animals', title: 'Wait for the end #pets #cute', src: 'videos/A/A1.mp4' },
+        { id: 'A2', author: '@daily_fauna', category: 'Animals', title: 'Only animal lovers will understand 😂 #animals', src: 'videos/A/A2.mp4' },
+        { id: 'A3', author: '@cute_creatures', category: 'Animals', title: 'This made my entire day #catsoftiktok', src: 'videos/A/A3.mp4' },
+        { id: 'A4', author: '@paws_claws', category: 'Animals', title: 'Normal behavior?? Asking for a friend 🐾', src: 'videos/A/A4.mp4' },
+        { id: 'A5', author: '@fluffy_friends', category: 'Animals', title: 'Wholesome content right here #pets', src: 'videos/A/A5.mp4' },
+        { id: 'A6', author: '@animal_vids', category: 'Animals', title: 'Turn sound on for this #cute', src: 'videos/A/A6.mp4' },
+        { id: 'A7', author: '@critter_corner', category: 'Animals', title: 'Every single time smh 💀 #dogsoftiktok', src: 'videos/A/A7.mp4' },
+        { id: 'A8', author: '@zoo_life', category: 'Animals', title: 'Look at this little guy #animals', src: 'videos/A/A8.mp4' },
+        { id: 'A9', author: '@happy_paws', category: 'Animals', title: 'Pure chaos in the best way possible', src: 'videos/A/A9.mp4' },
+        { id: 'A10', author: '@wild_world', category: 'Animals', title: 'They really thought they were hiding 😭', src: 'videos/A/A10.mp4' },
+        { id: 'A11', author: '@pet_central', category: 'Animals', title: 'Rate this animal 1-10 #pets', src: 'videos/A/A11.mp4' },
+        { id: 'A12', author: '@home_chef', category: 'Food', title: 'Easy 15-minute meal prep #foodie', src: 'videos/A/A12.mp4' },
+        { id: 'A13', author: '@food_chronicles', category: 'Food', title: 'You need to try this recipe ASAP #recipe', src: 'videos/A/A13.mp4' },
+        { id: 'A14', author: '@bites_and_brew', category: 'Food', title: 'Late night cravings hit different #food', src: 'videos/A/A14.mp4' },
+        { id: 'A15', author: '@kitchen_hack', category: 'Food', title: 'Did you know you could do this? #cooking', src: 'videos/A/A15.mp4' },
+        { id: 'A16', author: '@taste_test', category: 'Food', title: 'Rating viral food trends so you dont have to', src: 'videos/A/A16.mp4' },
+        { id: 'A17', author: '@sweet_tooth', category: 'Food', title: 'So satisfying to watch #baking #dessert', src: 'videos/A/A17.mp4' },
+        { id: 'A18', author: '@savory_delights', category: 'Food', title: 'The secret ingredient is love (and garlic) 🧄', src: 'videos/A/A18.mp4' },
+        { id: 'A19', author: '@quick_meals', category: 'Food', title: 'Budget friendly dinner idea #food', src: 'videos/A/A19.mp4' },
+        { id: 'A20', author: '@gourmet_athome', category: 'Food', title: 'Restaurant quality at home #chef', src: 'videos/A/A20.mp4' },
+        { id: 'A21', author: '@snack_attack', category: 'Food', title: 'Best comfort food combo ever', src: 'videos/A/A21.mp4' },
+        { id: 'A22', author: '@daily_recipes', category: 'Food', title: 'Save this for your grocery list #foodie', src: 'videos/A/A22.mp4' },
+        { id: 'A23', author: '@earth_focus', category: 'Nature', title: 'Mother nature showing off #nature #peaceful', src: 'videos/A/A23.mp4' },
+        { id: 'A24', author: '@scenic_views', category: 'Nature', title: 'Take a deep breath and watch this #calm', src: 'videos/A/A24.mp4' },
+        { id: 'A25', author: '@wild_escapes', category: 'Nature', title: 'Where would you rather be right now? #outdoors', src: 'videos/A/A25.mp4' },
+        { id: 'A26', author: '@nature_addict', category: 'Nature', title: 'Golden hour hits different out here ✨', src: 'videos/A/A26.mp4' },
+        { id: 'A27', author: '@trail_walker', category: 'Nature', title: 'Off the grid for the weekend #camping', src: 'videos/A/A27.mp4' },
+        { id: 'A28', author: '@forest_bathing', category: 'Nature', title: 'Listen to that sound #serene #nature', src: 'videos/A/A28.mp4' },
+        { id: 'A29', author: '@planet_earth', category: 'Nature', title: 'Views that dont even look real #travel', src: 'videos/A/A29.mp4' },
+        { id: 'A30', author: '@peak_views', category: 'Nature', title: 'Made it to the top just in time #hiking', src: 'videos/A/A30.mp4' },
+        { id: 'A31', author: '@drone_shots', category: 'Nature', title: 'Cinematic nature views #landscape', src: 'videos/A/A31.mp4' },
+        { id: 'A32', author: '@river_flows', category: 'Nature', title: 'The ultimate spot to clear your mind', src: 'videos/A/A32.mp4' },
+        { id: 'A33', author: '@outdoor_life', category: 'Nature', title: 'Nothing beats fresh air #explore', src: 'videos/A/A33.mp4' },
+        { id: 'A34', author: '@zen_nature', category: 'Nature', title: 'An absolute sanctuary #peaceful', src: 'videos/A/A34.mp4' },
+        { id: 'A35', author: '@wanderlust_vids', category: 'Travel', title: 'Adding this to the bucket list immediately ✈️', src: 'videos/A/A35.mp4' },
+        { id: 'A36', author: '@globe_trotter', category: 'Travel', title: 'POV: You booked the spontaneous trip', src: 'videos/A/A36.mp4' },
+        { id: 'A37', author: '@travel_diaries', category: 'Travel', title: 'Exploring hidden gems off the map #travel', src: 'videos/A/A37.mp4' },
+        { id: 'A38', author: '@flight_mode', category: 'Travel', title: 'Window seat views never get old #clouds', src: 'videos/A/A38.mp4' },
+        { id: 'A39', author: '@road_trip', category: 'Travel', title: 'The journey is the best part #adventure', src: 'videos/A/A39.mp4' },
+        { id: 'A40', author: '@city_exploring', category: 'Travel', title: 'Getting lost in a new city #vacation', src: 'videos/A/A40.mp4' },
+        { id: 'A41', author: '@passport_ready', category: 'Travel', title: 'Pack your bags we are leaving #trip', src: 'videos/A/A41.mp4' },
+        { id: 'A42', author: '@travel_tips', category: 'Travel', title: 'Things I wish I knew before traveling here', src: 'videos/A/A42.mp4' },
+        { id: 'A43', author: '@holiday_mood', category: 'Travel', title: 'Take me back here already #traveltok', src: 'videos/A/A43.mp4' },
+        { id: 'A44', author: '@transit_vids', category: 'Travel', title: 'Scenic train rides hit different #views', src: 'videos/A/A44.mp4' },
+        { id: 'A45', author: '@exploring_places', category: 'Travel', title: 'Architecture appreciation post #europe', src: 'videos/A/A45.mp4' },
+        { id: 'A46', author: '@sunset_chaser', category: 'Travel', title: 'Chasing sunsets around the world 🌅', src: 'videos/A/A46.mp4' },
+        { id: 'A47', author: '@sports_central', category: 'Sports', title: 'You cannot script moments like this 🤯 #sports', src: 'videos/A/A47.mp4' },
+        { id: 'A48', author: '@game_day', category: 'Sports', title: 'Pure skill on display #athlete', src: 'videos/A/A48.mp4' },
+        { id: 'A49', author: '@training_day', category: 'Sports', title: 'Hard work pays off #fitness #motivation', src: 'videos/A/A49.mp4' },
+        { id: 'A50', author: '@action_clips', category: 'Sports', title: 'Insane highlights from today #sports', src: 'videos/A/A50.mp4' },
+        { id: 'A51', author: '@court_side', category: 'Sports', title: 'Ankle breakers only #basketball', src: 'videos/A/A51.mp4' },
+        { id: 'A52', author: '@extreme_sports', category: 'Sports', title: 'Do not try this at home kids ⚠️', src: 'videos/A/A52.mp4' },
+        { id: 'A53', author: '@fitness_goal', category: 'Sports', title: 'New personal record achieved #gym', src: 'videos/A/A53.mp4' },
+        { id: 'A54', author: '@match_point', category: 'Sports', title: 'Down to the wire finish #competition', src: 'videos/A/A54.mp4' },
+        { id: 'A55', author: '@active_lifestyle', category: 'Sports', title: 'Morning workout grind #fitness', src: 'videos/A/A55.mp4' },
+        { id: 'A56', author: '@stadium_vibes', category: 'Sports', title: 'The energy in this arena was unreal', src: 'videos/A/A56.mp4' },
+        { id: 'A57', author: '@pro_tips', category: 'Sports', title: 'Quick form fix for better results', src: 'videos/A/A57.mp4' },
+        { id: 'A58', author: '@weekend_warrior', category: 'Sports', title: 'Doing what we love #sports', src: 'videos/A/A58.mp4' },
+        { id: 'A59', author: '@peak_performance', category: 'Sports', title: 'Pushing past the limits #athlete', src: 'videos/A/A59.mp4' },
+        { id: 'A60', author: '@style_edit', category: 'Fashion', title: 'Outfit ideas for the week #fashion #ootd', src: 'videos/A/A60.mp4' },
+        { id: 'A61', author: '@streetwear_daily', category: 'Fashion', title: 'Styling pieces three different ways', src: 'videos/A/A61.mp4' },
+        { id: 'A62', author: '@thrift_finds', category: 'Fashion', title: 'Best thrift haul find ever 🧥', src: 'videos/A/A62.mp4' },
+        { id: 'A63', author: '@runway_trends', category: 'Fashion', title: 'Dressed up with nowhere to go #style', src: 'videos/A/A63.mp4' },
+        { id: 'A64', author: '@capsule_closet', category: 'Fashion', title: 'Less is more when styling #minimalist', src: 'videos/A/A64.mp4' },
+        { id: 'A65', author: '@fit_check', category: 'Fashion', title: 'Rate the fit 1-10 #fashiontok', src: 'videos/A/A65.mp4' },
+        { id: 'A66', author: '@wardrobe_essentials', category: 'Fashion', title: 'Everyday staples you need in rotation', src: 'videos/A/A66.mp4' },
+        { id: 'A67', author: '@seasonal_style', category: 'Fashion', title: 'Layering game strong today ✨', src: 'videos/A/A67.mp4' },
+        { id: 'A68', author: '@denim_days', category: 'Fashion', title: 'Finding jeans that actually fit properly', src: 'videos/A/A68.mp4' },
+        { id: 'A69', author: '@accessories_check', category: 'Fashion', title: 'Details make the outfit #style', src: 'videos/A/A69.mp4' },
+        { id: 'A70', author: '@active_style', category: 'Fashion', title: 'Comfy airport outfit inspiration', src: 'videos/A/A70.mp4' },
+        { id: 'A71', author: '@chic_look', category: 'Fashion', title: 'Classic pieces never go out of style', src: 'videos/A/A71.mp4' },
+        { id: 'A72', author: '@glam_routine', category: 'Beauty', title: '5-minute makeup routine for busy days 💄', src: 'videos/A/A72.mp4' },
+        { id: 'A73', author: '@skincare_tips', category: 'Beauty', title: 'Glass skin secrets revealed #skincare', src: 'videos/A/A73.mp4' },
+        { id: 'A74', author: '@hair_goals', category: 'Beauty', title: 'How to get volume that actually lasts', src: 'videos/A/A74.mp4' },
+        { id: 'A75', author: '@nail_inspo', category: 'Beauty', title: 'Fresh set check #nails #beauty', src: 'videos/A/A75.mp4' },
+        { id: 'A76', author: '@beauty_hacks', category: 'Beauty', title: 'Game changing makeup technique', src: 'videos/A/A76.mp4' },
+        { id: 'A77', author: '@glow_up', category: 'Beauty', title: 'Self care Sunday reset routine ✨', src: 'videos/A/A77.mp4' },
+        { id: 'A78', author: '@perfume_collection', category: 'Beauty', title: 'Signature scent recommendations', src: 'videos/A/A78.mp4' },
+        { id: 'A79', author: '@brow_routine', category: 'Beauty', title: 'Framing the face right #brows', src: 'videos/A/A79.mp4' },
+        { id: 'A80', author: '@lip_combo', category: 'Beauty', title: 'The ultimate neutral lip combination', src: 'videos/A/A80.mp4' },
+        { id: 'A81', author: '@spa_day', category: 'Beauty', title: 'Unwind with me tonight #skincare', src: 'videos/A/A81.mp4' },
+        { id: 'A82', author: '@cozy_spaces', category: 'Interior Design', title: 'Room makeover on a budget 🏡 #decor', src: 'videos/A/A82.mp4' },
+        { id: 'A83', author: '@home_styling', category: 'Interior Design', title: 'Transforming this blank corner', src: 'videos/A/A83.mp4' },
+        { id: 'A84', author: '@plant_parent', category: 'Interior Design', title: 'My indoor jungle update #plants', src: 'videos/A/A84.mp4' },
+        { id: 'A85', author: '@aesthetic_home', category: 'Interior Design', title: 'Satisfying room organization clean up', src: 'videos/A/A85.mp4' },
+        { id: 'A86', author: '@diy_decor', category: 'Interior Design', title: 'Simple weekend DIY project #interior', src: 'videos/A/A86.mp4' },
+        { id: 'A87', author: '@apartment_living', category: 'Interior Design', title: 'Making a small space feel huge', src: 'videos/A/A87.mp4' },
+        { id: 'A88', author: '@lighting_mood', category: 'Interior Design', title: 'lighting is everything in a room', src: 'videos/A/A88.mp4' },
+        { id: 'A89', author: '@desk_setup', category: 'Interior Design', title: 'Clean desk setup tour #wfh', src: 'videos/A/A89.mp4' },
+        { id: 'A90', author: '@modern_interior', category: 'Interior Design', title: 'Minimalist decor inspiration', src: 'videos/A/A90.mp4' },
+        { id: 'A91', author: '@home_details', category: 'Interior Design', title: 'The little things that make a house a home', src: 'videos/A/A91.mp4' },
+        { id: 'A92', author: '@crafty_hands', category: 'Arts and Crafts', title: 'Trust the creative process 🎨 #art', src: 'videos/A/A92.mp4' },
+        { id: 'A93', author: '@diy_crafts', category: 'Arts and Crafts', title: 'Satisfying crafting ASMR #handmade', src: 'videos/A/A93.mp4' },
+        { id: 'A94', author: '@art_studio', category: 'Arts and Crafts', title: 'Working on a new project today', src: 'videos/A/A94.mp4' },
+        { id: 'A95', author: '@creative_mind', category: 'Arts and Crafts', title: 'From start to finish #arttok', src: 'videos/A/A95.mp4' },
+        { id: 'A96', author: '@handmade_goods', category: 'Arts and Crafts', title: 'Making gifts for friends #crafting', src: 'videos/A/A96.mp4' },
+        { id: 'A97', author: '@painting_process', category: 'Arts and Crafts', title: 'Mixing colors is so therapeutic', src: 'videos/A/A97.mp4' },
+        { id: 'A98', author: '@fiber_arts', category: 'Arts and Crafts', title: 'Slow crafting afternoon #creative', src: 'videos/A/A98.mp4' },
+        { id: 'A99', author: '@clay_art', category: 'Arts and Crafts', title: 'Shaping something fun today', src: 'videos/A/A99.mp4' },
+        { id: 'A100', author: '@artist_diaries', category: 'Arts and Crafts', title: 'Another piece added to the collection ✨', src: 'videos/A/A100.mp4' }
+      ],
+      "Misaligned": [
+        { id: 'B1', author: '@pet_lover', category: 'Animals', title: 'Wait for the end #pets #cute', src: 'videos/B/B1.mp4' },
+        { id: 'B2', author: '@daily_fauna', category: 'Animals', title: 'Only animal lovers will understand 😂 #animals', src: 'videos/B/B2.mp4' },
+        { id: 'B3', author: '@cute_creatures', category: 'Animals', title: 'This made my entire day #catsoftiktok', src: 'videos/B/B3.mp4' },
+        { id: 'B4', author: '@paws_claws', category: 'Animals', title: 'Normal behavior?? Asking for a friend 🐾', src: 'videos/B/B4.mp4' },
+        { id: 'B5', author: '@fluffy_friends', category: 'Animals', title: 'Wholesome content right here #pets', src: 'videos/B/B5.mp4' },
+        { id: 'B6', author: '@animal_vids', category: 'Animals', title: 'Turn sound on for this #cute', src: 'videos/B/B6.mp4' },
+        { id: 'B7', author: '@critter_corner', category: 'Animals', title: 'Every single time smh 💀 #dogsoftiktok', src: 'videos/B/B7.mp4' },
+        { id: 'B8', author: '@zoo_life', category: 'Animals', title: 'Look at this little guy #animals', src: 'videos/B/B8.mp4' },
+        { id: 'B9', author: '@happy_paws', category: 'Animals', title: 'Pure chaos in the best way possible', src: 'videos/B/B9.mp4' },
+        { id: 'B10', author: '@wild_world', category: 'Animals', title: 'They really thought they were hiding 😭', src: 'videos/B/B10.mp4' },
+        { id: 'B11', author: '@pet_central', category: 'Animals', title: 'Rate this animal 1-10 #pets', src: 'videos/B/B11.mp4' },
+        { id: 'B12', author: '@home_chef', category: 'Food', title: 'Easy 15-minute meal prep #foodie', src: 'videos/B/B12.mp4' },
+        { id: 'B13', author: '@food_chronicles', category: 'Food', title: 'You need to try this recipe ASAP #recipe', src: 'videos/B/B13.mp4' },
+        { id: 'B14', author: '@bites_and_brew', category: 'Food', title: 'Late night cravings hit different #food', src: 'videos/B/B14.mp4' },
+        { id: 'B15', author: '@kitchen_hack', category: 'Food', title: 'Did you know you could do this? #cooking', src: 'videos/B/B15.mp4' },
+        { id: 'B16', author: '@taste_test', category: 'Food', title: 'Rating viral food trends so you dont have to', src: 'videos/B/B16.mp4' },
+        { id: 'B17', author: '@sweet_tooth', category: 'Food', title: 'So satisfying to watch #baking #dessert', src: 'videos/B/B17.mp4' },
+        { id: 'B18', author: '@savory_delights', category: 'Food', title: 'The secret ingredient is love (and garlic) 🧄', src: 'videos/B/B18.mp4' },
+        { id: 'B19', author: '@quick_meals', category: 'Food', title: 'Budget friendly dinner idea #food', src: 'videos/B/B19.mp4' },
+        { id: 'B20', author: '@gourmet_athome', category: 'Food', title: 'Restaurant quality at home #chef', src: 'videos/B/B20.mp4' },
+        { id: 'B21', author: '@snack_attack', category: 'Food', title: 'Best comfort food combo ever', src: 'videos/B/B21.mp4' },
+        { id: 'B22', author: '@daily_recipes', category: 'Food', title: 'Save this for your grocery list #foodie', src: 'videos/B/B22.mp4' },
+        { id: 'B23', author: '@earth_focus', category: 'Nature', title: 'Mother nature showing off #nature #peaceful', src: 'videos/B/B23.mp4' },
+        { id: 'B24', author: '@scenic_views', category: 'Nature', title: 'Take a deep breath and watch this #calm', src: 'videos/B/B24.mp4' },
+        { id: 'B25', author: '@wild_escapes', category: 'Nature', title: 'Where would you rather be right now? #outdoors', src: 'videos/B/B25.mp4' },
+        { id: 'B26', author: '@nature_addict', category: 'Nature', title: 'Golden hour hits different out here ✨', src: 'videos/B/B26.mp4' },
+        { id: 'B27', author: '@trail_walker', category: 'Nature', title: 'Off the grid for the weekend #camping', src: 'videos/B/B27.mp4' },
+        { id: 'B28', author: '@forest_bathing', category: 'Nature', title: 'Listen to that sound #serene #nature', src: 'videos/B/B28.mp4' },
+        { id: 'B29', author: '@planet_earth', category: 'Nature', title: 'Views that dont even look real #travel', src: 'videos/B/B29.mp4' },
+        { id: 'B30', author: '@peak_views', category: 'Nature', title: 'Made it to the top just in time #hiking', src: 'videos/B/B30.mp4' },
+        { id: 'B31', author: '@drone_shots', category: 'Nature', title: 'Cinematic nature views #landscape', src: 'videos/B/B31.mp4' },
+        { id: 'B32', author: '@river_flows', category: 'Nature', title: 'The ultimate spot to clear your mind', src: 'videos/B/B32.mp4' },
+        { id: 'B33', author: '@outdoor_life', category: 'Nature', title: 'Nothing beats fresh air #explore', src: 'videos/B/B33.mp4' },
+        { id: 'B34', author: '@zen_nature', category: 'Nature', title: 'An absolute sanctuary #peaceful', src: 'videos/B/B34.mp4' },
+        { id: 'B35', author: '@wanderlust_vids', category: 'Travel', title: 'Adding this to the bucket list immediately ✈️', src: 'videos/B/B35.mp4' },
+        { id: 'B36', author: '@globe_trotter', category: 'Travel', title: 'POV: You booked the spontaneous trip', src: 'videos/B/B36.mp4' },
+        { id: 'B37', author: '@travel_diaries', category: 'Travel', title: 'Exploring hidden gems off the map #travel', src: 'videos/B/B37.mp4' },
+        { id: 'B38', author: '@flight_mode', category: 'Travel', title: 'Window seat views never get old #clouds', src: 'videos/B/B38.mp4' },
+        { id: 'B39', author: '@road_trip', category: 'Travel', title: 'The journey is the best part #adventure', src: 'videos/B/B39.mp4' },
+        { id: 'B40', author: '@city_exploring', category: 'Travel', title: 'Getting lost in a new city #vacation', src: 'videos/B/B40.mp4' },
+        { id: 'B41', author: '@passport_ready', category: 'Travel', title: 'Pack your bags we are leaving #trip', src: 'videos/B/B41.mp4' },
+        { id: 'B42', author: '@travel_tips', category: 'Travel', title: 'Things I wish I knew before traveling here', src: 'videos/B/B42.mp4' },
+        { id: 'B43', author: '@holiday_mood', category: 'Travel', title: 'Take me back here already #traveltok', src: 'videos/B/B43.mp4' },
+        { id: 'B44', author: '@transit_vids', category: 'Travel', title: 'Scenic train rides hit different #views', src: 'videos/B/B44.mp4' },
+        { id: 'B45', author: '@exploring_places', category: 'Travel', title: 'Architecture appreciation post #europe', src: 'videos/B/B45.mp4' },
+        { id: 'B46', author: '@sunset_chaser', category: 'Travel', title: 'Chasing sunsets around the world 🌅', src: 'videos/B/B46.mp4' },
+        { id: 'B47', author: '@sports_central', category: 'Sports', title: 'You cannot script moments like this 🤯 #sports', src: 'videos/B/B47.mp4' },
+        { id: 'B48', author: '@game_day', category: 'Sports', title: 'Pure skill on display #athlete', src: 'videos/B/B48.mp4' },
+        { id: 'B49', author: '@training_day', category: 'Sports', title: 'Hard work pays off #fitness #motivation', src: 'videos/B/B49.mp4' },
+        { id: 'B50', author: '@action_clips', category: 'Sports', title: 'Insane highlights from today #sports', src: 'videos/B/B50.mp4' },
+        { id: 'B51', author: '@court_side', category: 'Sports', title: 'Ankle breakers only #basketball', src: 'videos/B/B51.mp4' },
+        { id: 'B52', author: '@extreme_sports', category: 'Sports', title: 'Do not try this at home kids ⚠️', src: 'videos/B/B52.mp4' },
+        { id: 'B53', author: '@fitness_goal', category: 'Sports', title: 'New personal record achieved #gym', src: 'videos/B/B53.mp4' },
+        { id: 'B54', author: '@match_point', category: 'Sports', title: 'Down to the wire finish #competition', src: 'videos/B/B54.mp4' },
+        { id: 'B55', author: '@active_lifestyle', category: 'Sports', title: 'Morning workout grind #fitness', src: 'videos/B/B55.mp4' },
+        { id: 'B56', author: '@stadium_vibes', category: 'Sports', title: 'The energy in this arena was unreal', src: 'videos/B/B56.mp4' },
+        { id: 'B57', author: '@pro_tips', category: 'Sports', title: 'Quick form fix for better results', src: 'videos/B/B57.mp4' },
+        { id: 'B58', author: '@weekend_warrior', category: 'Sports', title: 'Doing what we love #sports', src: 'videos/B/B58.mp4' },
+        { id: 'B59', author: '@peak_performance', category: 'Sports', title: 'Pushing past the limits #athlete', src: 'videos/B/B59.mp4' },
+        { id: 'B60', author: '@style_edit', category: 'Fashion', title: 'Outfit ideas for the week #fashion #ootd', src: 'videos/B/B60.mp4' },
+        { id: 'B61', author: '@streetwear_daily', category: 'Fashion', title: 'Styling pieces three different ways', src: 'videos/B/B61.mp4' },
+        { id: 'B62', author: '@thrift_finds', category: 'Fashion', title: 'Best thrift haul find ever 🧥', src: 'videos/B/B62.mp4' },
+        { id: 'B63', author: '@runway_trends', category: 'Fashion', title: 'Dressed up with nowhere to go #style', src: 'videos/B/B63.mp4' },
+        { id: 'B64', author: '@capsule_closet', category: 'Fashion', title: 'Less is more when styling #minimalist', src: 'videos/B/B64.mp4' },
+        { id: 'B65', author: '@fit_check', category: 'Fashion', title: 'Rate the fit 1-10 #fashiontok', src: 'videos/B/B65.mp4' },
+        { id: 'B66', author: '@wardrobe_essentials', category: 'Fashion', title: 'Everyday staples you need in rotation', src: 'videos/B/B66.mp4' },
+        { id: 'B67', author: '@seasonal_style', category: 'Fashion', title: 'Layering game strong today ✨', src: 'videos/B/B67.mp4' },
+        { id: 'B68', author: '@denim_days', category: 'Fashion', title: 'Finding jeans that actually fit properly', src: 'videos/B/B68.mp4' },
+        { id: 'B69', author: '@accessories_check', category: 'Fashion', title: 'Details make the outfit #style', src: 'videos/B/B69.mp4' },
+        { id: 'B70', author: '@active_style', category: 'Fashion', title: 'Comfy airport outfit inspiration', src: 'videos/B/B70.mp4' },
+        { id: 'B71', author: '@chic_look', category: 'Fashion', title: 'Classic pieces never go out of style', src: 'videos/B/B71.mp4' },
+        { id: 'B72', author: '@glam_routine', category: 'Beauty', title: '5-minute makeup routine for busy days 💄', src: 'videos/B/B72.mp4' },
+        { id: 'B73', author: '@skincare_tips', category: 'Beauty', title: 'Glass skin secrets revealed #skincare', src: 'videos/B/B73.mp4' },
+        { id: 'B74', author: '@hair_goals', category: 'Beauty', title: 'How to get volume that actually lasts', src: 'videos/B/B74.mp4' },
+        { id: 'B75', author: '@nail_inspo', category: 'Beauty', title: 'Fresh set check #nails #beauty', src: 'videos/B/B75.mp4' },
+        { id: 'B76', author: '@beauty_hacks', category: 'Beauty', title: 'Game changing makeup technique', src: 'videos/B/B76.mp4' },
+        { id: 'B77', author: '@glow_up', category: 'Beauty', title: 'Self care Sunday reset routine ✨', src: 'videos/B/B77.mp4' },
+        { id: 'B78', author: '@perfume_collection', category: 'Beauty', title: 'Signature scent recommendations', src: 'videos/B/B78.mp4' },
+        { id: 'B79', author: '@brow_routine', category: 'Beauty', title: 'Framing the face right #brows', src: 'videos/B/B79.mp4' },
+        { id: 'B80', author: '@lip_combo', category: 'Beauty', title: 'The ultimate neutral lip combination', src: 'videos/B/B80.mp4' },
+        { id: 'B81', author: '@spa_day', category: 'Beauty', title: 'Unwind with me tonight #skincare', src: 'videos/B/B81.mp4' },
+        { id: 'B82', author: '@cozy_spaces', category: 'Interior Design', title: 'Room makeover on a budget 🏡 #decor', src: 'videos/B/B82.mp4' },
+        { id: 'B83', author: '@home_styling', category: 'Interior Design', title: 'Transforming this blank corner', src: 'videos/B/B83.mp4' },
+        { id: 'B84', author: '@plant_parent', category: 'Interior Design', title: 'My indoor jungle update #plants', src: 'videos/B/B84.mp4' },
+        { id: 'B85', author: '@aesthetic_home', category: 'Interior Design', title: 'Satisfying room organization clean up', src: 'videos/B/B85.mp4' },
+        { id: 'B86', author: '@diy_decor', category: 'Interior Design', title: 'Simple weekend DIY project #interior', src: 'videos/B/B86.mp4' },
+        { id: 'B87', author: '@apartment_living', category: 'Interior Design', title: 'Making a small space feel huge', src: 'videos/B/B87.mp4' },
+        { id: 'B88', author: '@lighting_mood', category: 'Interior Design', title: 'Lighting is everything in a room ✨', src: 'videos/B/B88.mp4' },
+        { id: 'B89', author: '@desk_setup', category: 'Interior Design', title: 'Clean desk setup tour #wfh', src: 'videos/B/B89.mp4' },
+        { id: 'B90', author: '@modern_interior', category: 'Interior Design', title: 'Minimalist decor inspiration', src: 'videos/B/B90.mp4' },
+        { id: 'B91', author: '@home_details', category: 'Interior Design', title: 'The little things that make a house a home', src: 'videos/B/B91.mp4' },
+        { id: 'B92', author: '@crafty_hands', category: 'Arts and Crafts', title: 'Trust the creative process 🎨 #art', src: 'videos/B/B92.mp4' },
+        { id: 'B93', author: '@diy_crafts', category: 'Arts and Crafts', title: 'Satisfying crafting ASMR #handmade', src: 'videos/B/B93.mp4' },
+        { id: 'B94', author: '@art_studio', category: 'Arts and Crafts', title: 'Working on a new project today', src: 'videos/B/B94.mp4' },
+        { id: 'B95', author: '@creative_mind', category: 'Arts and Crafts', title: 'From start to finish #arttok', src: 'videos/B/B95.mp4' },
+        { id: 'B96', author: '@handmade_goods', category: 'Arts and Crafts', title: 'Making gifts for friends #crafting', src: 'videos/B/B96.mp4' },
+        { id: 'B97', author: '@painting_process', category: 'Arts and Crafts', title: 'Mixing colors is so therapeutic', src: 'videos/B/B97.mp4' },
+        { id: 'B98', author: '@fiber_arts', category: 'Arts and Crafts', title: 'Slow crafting afternoon #creative', src: 'videos/B/B98.mp4' },
+        { id: 'B99', author: '@clay_art', category: 'Arts and Crafts', title: 'Shaping something fun today', src: 'videos/B/B99.mp4' },
+        { id: 'B100', author: '@artist_diaries', category: 'Arts and Crafts', title: 'Another piece added to the collection ✨', src: 'videos/B/B100.mp4' }
+      ],
+      "Non-Responsive": [
+        { id: 'C1', author: '@pet_lover', category: 'Animals', title: 'Wait for the end #pets #cute', src: 'videos/C/C1.mp4' },
+        { id: 'C2', author: '@daily_fauna', category: 'Animals', title: 'Only animal lovers will understand 😂 #animals', src: 'videos/C/C2.mp4' },
+        { id: 'C3', author: '@cute_creatures', category: 'Animals', title: 'This made my entire day #catsoftiktok', src: 'videos/C/C3.mp4' },
+        { id: 'C4', author: '@paws_claws', category: 'Animals', title: 'Normal behavior?? Asking for a friend 🐾', src: 'videos/C/C4.mp4' },
+        { id: 'C5', author: '@fluffy_friends', category: 'Animals', title: 'Wholesome content right here #pets', src: 'videos/C/C5.mp4' },
+        { id: 'C6', author: '@animal_vids', category: 'Animals', title: 'Turn sound on for this #cute', src: 'videos/C/C6.mp4' },
+        { id: 'C7', author: '@critter_corner', category: 'Animals', title: 'Every single time smh 💀 #dogsoftiktok', src: 'videos/C/C7.mp4' },
+        { id: 'C8', author: '@zoo_life', category: 'Animals', title: 'Look at this little guy #animals', src: 'videos/C/C8.mp4' },
+        { id: 'C9', author: '@happy_paws', category: 'Animals', title: 'Pure chaos in the best way possible', src: 'videos/C/C9.mp4' },
+        { id: 'C10', author: '@wild_world', category: 'Animals', title: 'They really thought they were hiding 😭', src: 'videos/C/C10.mp4' },
+        { id: 'C11', author: '@pet_central', category: 'Animals', title: 'Rate this animal 1-10 #pets', src: 'videos/C/C11.mp4' },
+        { id: 'C12', author: '@home_chef', category: 'Food', title: 'Easy 15-minute meal prep #foodie', src: 'videos/C/C12.mp4' },
+        { id: 'C13', author: '@food_chronicles', category: 'Food', title: 'You need to try this recipe ASAP #recipe', src: 'videos/C/C13.mp4' },
+        { id: 'C14', author: '@bites_and_brew', category: 'Food', title: 'Late night cravings hit different #food', src: 'videos/C/C14.mp4' },
+        { id: 'C15', author: '@kitchen_hack', category: 'Food', title: 'Did you know you could do this? #cooking', src: 'videos/C/C15.mp4' },
+        { id: 'C16', author: '@taste_test', category: 'Food', title: 'Rating viral food trends so you dont have to', src: 'videos/C/C16.mp4' },
+        { id: 'C17', author: '@sweet_tooth', category: 'Food', title: 'So satisfying to watch #baking #dessert', src: 'videos/C/C17.mp4' },
+        { id: 'C18', author: '@savory_delights', category: 'Food', title: 'The secret ingredient is love (and garlic) 🧄', src: 'videos/C/C18.mp4' },
+        { id: 'C19', author: 'Food', title: 'Budget friendly dinner idea #food', src: 'videos/C/C19.mp4' },
+        { id: 'C20', author: '@gourmet_athome', category: 'Food', title: 'Restaurant quality at home #chef', src: 'videos/C/C20.mp4' },
+        { id: 'C21', author: '@snack_attack', category: 'Food', title: 'Best comfort food combo ever', src: 'videos/C/C21.mp4' },
+        { id: 'C22', author: '@daily_recipes', category: 'Food', title: 'Save this for your grocery list #foodie', src: 'videos/C/C22.mp4' },
+        { id: 'C23', author: '@earth_focus', category: 'Nature', title: 'Mother nature showing off #nature #peaceful', src: 'videos/C/C23.mp4' },
+        { id: 'C24', author: '@scenic_views', category: 'Nature', title: 'Take a deep breath and watch this #calm', src: 'videos/C/C24.mp4' },
+        { id: 'C25', author: '@wild_escapes', category: 'Nature', title: 'Where would you rather be right now? #outdoors', src: 'videos/C/C25.mp4' },
+        { id: 'C26', author: '@nature_addict', category: 'Nature', title: 'Golden hour hits different out here ✨', src: 'videos/C/C26.mp4' },
+        { id: 'C27', author: '@trail_walker', category: 'Nature', title: 'Off the grid for the weekend #camping', src: 'videos/C/C27.mp4' },
+        { id: 'C28', author: '@forest_bathing', category: 'Nature', title: 'Listen to that sound #serene #nature', src: 'videos/C/C28.mp4' },
+        { id: 'C29', author: '@planet_earth', category: 'Nature', title: 'Views that dont even look real #travel', src: 'videos/C/C29.mp4' },
+        { id: 'C30', author: '@peak_views', category: 'Nature', title: 'Made it to the top just in time #hiking', src: 'videos/C/C30.mp4' },
+        { id: 'C31', author: '@drone_shots', category: 'Nature', title: 'Cinematic nature views #landscape', src: 'videos/C/C31.mp4' },
+        { id: 'C32', author: '@river_flows', category: 'Nature', title: 'The ultimate spot to clear your mind', src: 'videos/C/C32.mp4' },
+        { id: 'C33', author: '@outdoor_life', category: 'Nature', title: 'Nothing beats fresh air #explore', src: 'videos/C/C33.mp4' },
+        { id: 'C34', author: '@zen_nature', category: 'Nature', title: 'An absolute sanctuary #peaceful', src: 'videos/C/C34.mp4' },
+        { id: 'C35', author: '@wanderlust_vids', category: 'Travel', title: 'Adding this to the bucket list immediately ✈️', src: 'videos/C/C35.mp4' },
+        { id: 'C36', author: '@globe_trotter', category: 'Travel', title: 'POV: You booked the spontaneous trip', src: 'videos/C/C36.mp4' },
+        { id: 'C37', author: '@travel_diaries', category: 'Travel', title: 'Exploring hidden gems off the map #travel', src: 'videos/C/C37.mp4' },
+        { id: 'C38', author: '@flight_mode', category: 'Travel', title: 'Window seat views never get old #clouds', src: 'videos/C/C38.mp4' },
+        { id: 'C39', author: '@road_trip', category: 'Travel', title: 'The journey is the best part #adventure', src: 'videos/C/C39.mp4' },
+        { id: 'C40', author: '@city_exploring', category: 'Travel', title: 'Getting lost in a new city #vacation', src: 'videos/C/C40.mp4' },
+        { id: 'C41', author: '@passport_ready', category: 'Travel', title: 'Pack your bags we are leaving #trip', src: 'videos/C/C41.mp4' },
+        { id: 'C42', author: '@travel_tips', category: 'Travel', title: 'Things I wish I knew before traveling here', src: 'videos/C/C42.mp4' },
+        { id: 'C43', author: '@holiday_mood', category: 'Travel', title: 'Take me back here already #traveltok', src: 'videos/C/C43.mp4' },
+        { id: 'C44', author: '@transit_vids', category: 'Travel', title: 'Scenic train rides hit different #views', src: 'videos/C/C44.mp4' },
+        { id: 'C45', author: '@exploring_places', category: 'Travel', title: 'Architecture appreciation post #europe', src: 'videos/C/C45.mp4' },
+        { id: 'C46', author: '@sunset_chaser', category: 'Travel', title: 'Chasing sunsets around the world 🌅', src: 'videos/C/C46.mp4' },
+        { id: 'C47', author: '@sports_central', category: 'Sports', title: 'You cannot script moments like this 🤯 #sports', src: 'videos/C/C47.mp4' },
+        { id: 'C48', author: '@game_day', category: 'Sports', title: 'Pure skill on display #athlete', src: 'videos/C/C48.mp4' },
+        { id: 'C49', author: '@training_day', category: 'Sports', title: 'Hard work pays off #fitness #motivation', src: 'videos/C/C49.mp4' },
+        { id: 'C50', author: '@action_clips', category: 'Sports', title: 'Insane highlights from today #sports', src: 'videos/C/C50.mp4' },
+        { id: 'C51', author: '@court_side', category: 'Sports', title: 'Ankle breakers only #basketball', src: 'videos/C/C51.mp4' },
+        { id: 'C52', author: '@extreme_sports', category: 'Sports', title: 'Do not try this at home kids ⚠️', src: 'videos/C/C52.mp4' },
+        { id: 'C53', author: '@fitness_goal', category: 'Sports', title: 'New personal record achieved #gym', src: 'videos/C/C53.mp4' },
+        { id: 'C54', author: '@match_point', category: 'Sports', title: 'Down to the wire finish #competition', src: 'videos/C/C54.mp4' },
+        { id: 'C55', author: '@active_lifestyle', category: 'Sports', title: 'Morning workout grind #fitness', src: 'videos/C/C55.mp4' },
+        { id: 'C56', author: '@stadium_vibes', category: 'Sports', title: 'The energy in this arena was unreal', src: 'videos/C/C56.mp4' },
+        { id: 'C57', author: '@pro_tips', category: 'Sports', title: 'Quick form fix for better results', src: 'videos/C/C57.mp4' },
+        { id: 'C58', author: '@weekend_warrior', category: 'Sports', title: 'Doing what we love #sports', src: 'videos/C/C58.mp4' },
+        { id: 'C59', author: '@peak_performance', category: 'Sports', title: 'Pushing past the limits #athlete', src: 'videos/C/C59.mp4' },
+        { id: 'C60', author: '@style_edit', category: 'Fashion', title: 'Outfit ideas for the week #fashion #ootd', src: 'videos/C/C60.mp4' },
+        { id: 'C61', author: '@streetwear_daily', category: 'Fashion', title: 'Styling pieces three different ways', src: 'videos/C/C61.mp4' },
+        { id: 'C62', author: '@thrift_finds', category: 'Fashion', title: 'Best thrift haul find ever 🧥', src: 'videos/C/C62.mp4' },
+        { id: 'C63', author: '@runway_trends', category: 'Fashion', title: 'Dressed up with nowhere to go #style', src: 'videos/C/C63.mp4' },
+        { id: 'C64', author: '@capsule_closet', category: 'Fashion', title: 'Less is more when styling #minimalist', src: 'videos/C/C64.mp4' },
+        { id: 'C65', author: '@fit_check', category: 'Fashion', title: 'Rate the fit 1-10 #fashiontok', src: 'videos/C/C65.mp4' },
+        { id: 'C66', author: '@wardrobe_essentials', category: 'Fashion', title: 'Everyday staples you need in rotation', src: 'videos/C/C66.mp4' },
+        { id: 'C67', author: '@seasonal_style', category: 'Fashion', title: 'Layering game strong today ✨', src: 'videos/C/C67.mp4' },
+        { id: 'C68', author: '@denim_days', category: 'Fashion', title: 'Finding jeans that actually fit properly', src: 'videos/C/C68.mp4' },
+        { id: 'C69', author: '@accessories_check', category: 'Fashion', title: 'Details make the outfit #style', src: 'videos/C/C69.mp4' },
+        { id: 'C70', author: '@active_style', category: 'Fashion', title: 'Comfy airport outfit inspiration', src: 'videos/C/C70.mp4' },
+        { id: 'C71', author: '@chic_look', category: 'Fashion', title: 'Classic pieces never go out of style', src: 'videos/C/C71.mp4' },
+        { id: 'C72', author: '@glam_routine', category: 'Beauty', title: '5-minute makeup routine for busy days 💄', src: 'videos/C/C72.mp4' },
+        { id: 'C73', author: '@skincare_tips', category: 'Beauty', title: 'Glass skin secrets revealed #skincare', src: 'videos/C/C73.mp4' },
+        { id: 'C74', author: '@hair_goals', category: 'Beauty', title: 'How to get volume that actually lasts', src: 'videos/C/C74.mp4' },
+        { id: 'C75', author: '@nail_inspo', category: 'Beauty', title: 'Fresh set check #nails #beauty', src: 'videos/C/C75.mp4' },
+        { id: 'C76', author: '@beauty_hacks', category: 'Beauty', title: 'Game changing makeup technique', src: 'videos/C/C76.mp4' },
+        { id: 'C77', author: '@glow_up', category: 'Beauty', title: 'Self care Sunday reset routine ✨', src: 'videos/C/C77.mp4' },
+        { id: 'C78', author: '@perfume_collection', category: 'Beauty', title: 'Signature scent recommendations', src: 'videos/C/C78.mp4' },
+        { id: 'C79', author: '@brow_routine', category: 'Beauty', title: 'Framing the face right #brows', src: 'videos/C/C79.mp4' },
+        { id: 'C80', author: '@lip_combo', category: 'Beauty', title: 'The ultimate neutral lip combination', src: 'videos/C/C80.mp4' },
+        { id: 'C81', author: '@spa_day', category: 'Beauty', title: 'Unwind with me tonight #skincare', src: 'videos/C/C81.mp4' },
+        { id: 'C82', author: '@cozy_spaces', category: 'Interior Design', title: 'Room makeover on a budget 🏡 #decor', src: 'videos/C/C82.mp4' },
+        { id: 'C83', author: '@home_styling', category: 'Interior Design', title: 'Transforming this blank corner', src: 'videos/C/C83.mp4' },
+        { id: 'C84', author: '@plant_parent', category: 'Interior Design', title: 'My indoor jungle update #plants', src: 'videos/C/C84.mp4' },
+        { id: 'C85', author: '@aesthetic_home', category: 'Interior Design', title: 'Satisfying room organization clean up', src: 'videos/C/C85.mp4' },
+        { id: 'C86', author: '@diy_decor', category: 'Interior Design', title: 'Simple weekend DIY project #interior', src: 'videos/C/C86.mp4' },
+        { id: 'C87', author: '@apartment_living', category: 'Interior Design', title: 'Making a small space feel huge', src: 'videos/C/C87.mp4' },
+        { id: 'C88', author: '@lighting_mood', category: 'Interior Design', title: 'Lighting is everything in a room ✨', src: 'videos/C/C88.mp4' },
+        { id: 'C89', author: '@desk_setup', category: 'Interior Design', title: 'Clean desk setup tour #wfh', src: 'videos/C/C89.mp4' },
+        { id: 'C90', author: '@modern_interior', category: 'Interior Design', title: 'Minimalist decor inspiration', src: 'videos/C/C90.mp4' },
+        { id: 'C91', author: '@home_details', category: 'Interior Design', title: 'The little things that make a house a home', src: 'videos/C/C91.mp4' },
+        { id: 'C92', author: '@crafty_hands', category: 'Arts and Crafts', title: 'Trust the creative process 🎨 #art', src: 'videos/C/C92.mp4' },
+        { id: 'C93', author: '@diy_crafts', category: 'Arts and Crafts', title: 'Satisfying crafting ASMR #handmade', src: 'videos/C/C93.mp4' },
+        { id: 'C94', author: '@art_studio', category: 'Arts and Crafts', title: 'Working on a new project today', src: 'videos/C/C94.mp4' },
+        { id: 'C95', author: '@creative_mind', category: 'Arts and Crafts', title: 'From start to finish #arttok', src: 'videos/C/C95.mp4' },
+        { id: 'C96', author: '@handmade_goods', category: 'Arts and Crafts', title: 'Making gifts for friends #crafting', src: 'videos/C/C96.mp4' },
+        { id: 'C97', author: '@painting_process', category: 'Arts and Crafts', title: 'Mixing colors is so therapeutic', src: 'videos/C/C97.mp4' },
+        { id: 'C98', author: '@fiber_arts', category: 'Arts and Crafts', title: 'Slow crafting afternoon #creative', src: 'videos/C/C98.mp4' },
+        { id: 'C99', author: '@clay_art', category: 'Arts and Crafts', title: 'Shaping something fun today', src: 'videos/C/C99.mp4' },
+        { id: 'C100', author: '@artist_diaries', category: 'Arts and Crafts', title: 'Another piece added to the collection ✨', src: 'videos/C/C100.mp4' }
+      ]
+    };
+
+    const commentPool = [
+      { user: '@sarah_m', text: 'Yessssssss' },
+      { user: '@alex_99', text: '@sarah_m look at this' },
+      { user: '@jordan_k', text: 'This is so satisfying to watch haha' },
+      { user: '@Taylor_g', text: '10/10 content right here 🔥' },
+      { user: '@chris_p', text: 'I watched this way too many times' },
+      { user: '@emily_r', text: 'Omg following immediately' },
+      { user: '@liam_bron4', text: 'The ending though 😂' },
+      { user: '@chloe_w', text: 'Needed to see this today honestly' },
+      { user: '@noah_hawks', text: 'Bro thought he was slick 💀' },
+      { user: '@zack_t', text: 'This song goes so hard' },
+      { user: '@hannah_s', text: 'Aesthetic is unmatched ✨' },
+      { user: '@lucasbeflippin', text: 'Wait that actually looks amazing' },
+      { user: '@mia_d', text: 'Trueeee couldn’t agree more lol' },
+      { user: '@ethan_b', text: 'Core memory unlocked' },
+      { user: '@ava_joker', text: 'How do people even make these??' },
+      { user: '@mason_k', text: 'Quality post as always' },
+      { user: '@sophia_l', text: 'Saving this video for later fs' },
+      { user: '@jackson_p', text: 'The absolute dream' },
+      { user: '@isabella_r', text: 'Can we talk about the details in the background??' },
+      { user: '@aidan_w', text: 'Subscribed instantly' },
+      { user: '@zoe_99', text: 'This made my jaw drop ngl' },
+      { user: '@logan_f', text: 'Okay but why is this so accurate' },
+      { user: '@gracehelburns34', text: 'Pure art right here' },
+      { user: '@calebstorie', text: 'Algorithm brought me here and im not mad' },
+      { user: '@lily_v3984', text: 'Brb crying this is so good' }
+    ];
+
+    let sessionData = [];
+    let participantId = "";
+    let condition = "Aligned";
+    let activeQueue = []; 
+    let queueIndex = 0;   
+    let sequencePosition = 0;
+    let videoStartTime = 0;
+    let loopCount = 0;
+    let userCategoryPreferences = {}; 
+    let isLiked = false, isDisliked = false, isSaved = false, isFollowed = false, hasOpenedCommentsThisView = false;
+    let viewedIndices = new Set();
+    let viewHistory = [];
+    let currentPostComments = [];
+    let remainingSeconds = BLOCK_DURATION_SECONDS;
+    let timerInterval = null;
+    let sessionEnded = false;
+
+    function shuffleArray(array) {
+      let arr = [...array];
+      for (let i = arr.length - 1; i > 0; i--) {
+        let j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    }
+
+    function formatTime(totalSecs) {
+      const mins = Math.floor(totalSecs / 60);
+      const secs = totalSecs % 60;
+      return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    }
+
+    function startBlockTimer() {
+      clearInterval(timerInterval);
+      remainingSeconds = BLOCK_DURATION_SECONDS;
+      document.getElementById('block-timer').innerText = formatTime(remainingSeconds);
+
+      timerInterval = setInterval(() => {
+        remainingSeconds--;
+        if (remainingSeconds < 0) remainingSeconds = 0;
+        document.getElementById('block-timer').innerText = formatTime(remainingSeconds);
+
+        if (remainingSeconds <= 0) {
+          clearInterval(timerInterval);
+          endSession('timer_7min_expired');
+        }
+      }, 1000);
+    }
+
+    function startSession() {
+      participantId = document.getElementById('participant-id').value.trim() || "Anonymous";
+      condition = document.getElementById('condition-select').value;
+      sessionEnded = false;
+      sessionData = [];
+      userCategoryPreferences = {};
+
+      document.getElementById('setup-screen').style.display = 'none';
+      document.getElementById('app-container').style.display = 'block';
+
+      if (condition === 'Non-Responsive') {
+        activeQueue = [...videoSubsets["Non-Responsive"]];
+      } else if (condition === 'Aligned') {
+        activeQueue = shuffleArray(videoSubsets["Aligned"]);
+      } else {
+        activeQueue = shuffleArray(videoSubsets["Misaligned"]);
+      }
+
+      queueIndex = 0;
+      sequencePosition = 1;
+      viewedIndices.clear();
+      viewHistory = [];
+      
+      setupVideoListeners();
+      startBlockTimer();
+      loadVideo();
+    }
+
+    function setupVideoListeners() {
+      const videoElem = document.getElementById('feed-video');
+      if (videoElem.dataset.listenerAttached) return;
+      videoElem.addEventListener('seeked', () => {
+        if (videoElem.currentTime < 0.5) loopCount++;
+      });
+      videoElem.dataset.listenerAttached = "true";
+    }
+
+    function loadVideo() {
+      if (sessionEnded) return;
+      viewedIndices.add(queueIndex);
+      const currentVid = activeQueue[queueIndex];
+      const videoElem = document.getElementById('feed-video');
+      
+      videoElem.src = currentVid.src;
+      document.getElementById('video-author').innerText = currentVid.author;
+      document.getElementById('video-title').innerText = currentVid.title;
+      
+      currentPostComments = generateCommentsForVideo(currentVid.id);
+
+      isLiked = isDisliked = isSaved = isFollowed = hasOpenedCommentsThisView = false;
+      loopCount = 0;
+      document.querySelectorAll('.action-btn').forEach(btn => btn.classList.remove('active-like', 'active-dislike', 'active-generic'));
+      
+      const profileBtn = document.getElementById('profile-btn');
+      const followBadge = document.getElementById('follow-badge');
+      profileBtn.classList.remove('is-following');
+      followBadge.innerText = '+';
+
+      document.getElementById('prev-btn').disabled = viewHistory.length === 0;
+
+      videoStartTime = Date.now();
+      videoElem.play().catch(e => console.log("Autoplay check:", e));
+    }
+
+    function generateCommentsForVideo(videoId) {
+      let seed = 0;
+      for (let i = 0; i < videoId.length; i++) {
+        seed += videoId.charCodeAt(i);
+      }
+      let shuffled = [...commentPool];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        let j = (seed + i) % shuffled.length;
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+      let count = 3 + (seed % 3);
+      return shuffled.slice(0, count).map((c, index) => ({
+        user: c.user,
+        text: c.text,
+        likes: 5 + ((seed * (index + 1)) % 120),
+        liked: false
+      }));
+    }
+
+    function togglePlayPause() {
+      const videoElem = document.getElementById('feed-video');
+      if (videoElem.paused) {
+        videoElem.play();
+        logAction('play');
+      } else {
+        videoElem.pause();
+        logAction('pause');
+      }
+    }
+
+    function toggleLike() {
+      if (isDisliked) toggleDislike();
+      isLiked = !isLiked;
+      const cat = activeQueue[queueIndex].category;
+      if (isLiked) {
+        document.getElementById('like-btn').classList.add('active-like');
+        userCategoryPreferences[cat] = (userCategoryPreferences[cat] || 0) + 3;
+        logAction('like');
+      } else {
+        document.getElementById('like-btn').classList.remove('active-like');
+        userCategoryPreferences[cat] = Math.max(-5, (userCategoryPreferences[cat] || 0) - 3);
+        logAction('unlike');
+      }
+    }
+
+    function toggleDislike() {
+      if (isLiked) toggleLike();
+      isDisliked = !isDisliked;
+      const cat = activeQueue[queueIndex].category;
+      if (isDisliked) {
+        document.getElementById('dislike-btn').classList.add('active-dislike');
+        userCategoryPreferences[cat] = (userCategoryPreferences[cat] || 0) - 10;
+        logAction('not_interested');
+      } else {
+        document.getElementById('dislike-btn').classList.remove('active-dislike');
+        userCategoryPreferences[cat] = (userCategoryPreferences[cat] || 0) + 10;
+        logAction('undo_not_interested');
+      }
+    }
+
+    function toggleSave() {
+      isSaved = !isSaved;
+      const cat = activeQueue[queueIndex].category;
+      if (isSaved) {
+        document.getElementById('save-btn').classList.add('active-generic');
+        userCategoryPreferences[cat] = (userCategoryPreferences[cat] || 0) + 4;
+        logAction('save');
+      } else {
+        document.getElementById('save-btn').classList.remove('active-generic');
+        logAction('unsave');
+      }
+    }
+
+    function toggleFollow() {
+      isFollowed = !isFollowed;
+      const cat = activeQueue[queueIndex].category;
+      const profileBtn = document.getElementById('profile-btn');
+      const followBadge = document.getElementById('follow-badge');
+
+      if (isFollowed) {
+        profileBtn.classList.add('is-following');
+        followBadge.innerText = '✓';
+        userCategoryPreferences[cat] = (userCategoryPreferences[cat] || 0) + 5;
+        logAction('follow');
+      } else {
+        profileBtn.classList.remove('is-following');
+        followBadge.innerText = '+';
+        logAction('unfollow');
+      }
+    }
+
+    function openComments() {
+      document.getElementById('feed-video').pause();
+      const cat = activeQueue[queueIndex].category;
+      if (!hasOpenedCommentsThisView) {
+        userCategoryPreferences[cat] = (userCategoryPreferences[cat] || 0) + 1;
+        hasOpenedCommentsThisView = true;
+      }
+      logAction('open_comments');
+      renderComments();
+      document.getElementById('comments-drawer').style.display = 'flex';
+    }
+
+    function closeComments() {
+      document.getElementById('comments-drawer').style.display = 'none';
+      document.getElementById('feed-video').play();
+    }
+
+    function renderComments() {
+      const container = document.getElementById('comments-list-container');
+      document.getElementById('comments-title-count').innerText = `Comments (${currentPostComments.length})`;
+      container.innerHTML = '';
+      currentPostComments.forEach((c, idx) => {
+        container.innerHTML += `
+          <div class="comment-item">
+            <div class="comment-avatar">👤</div>
+            <div class="comment-content">
+              <div class="comment-user">${c.user}</div>
+              <div class="comment-text">${c.text}</div>
+            </div>
+            <button class="comment-like-btn ${c.liked ? 'liked' : ''}" onclick="toggleCommentLike(${idx})">
+              <span>❤️</span>
+              <span>${c.likes}</span>
+            </button>
+          </div>
+        `;
+      });
+    }
+
+    function toggleCommentLike(idx) {
+      currentPostComments[idx].liked = !currentPostComments[idx].liked;
+      currentPostComments[idx].likes += currentPostComments[idx].liked ? 1 : -1;
+      const cat = activeQueue[queueIndex].category;
+      if (currentPostComments[idx].liked) {
+        userCategoryPreferences[cat] = (userCategoryPreferences[cat] || 0) + 1;
+        logAction('like_comment');
+      } else {
+        userCategoryPreferences[cat] = (userCategoryPreferences[cat] || 0) - 1;
+        logAction('unlike_comment');
+      }
+      renderComments();
+    }
+
+    function openShareModal() {
+      document.getElementById('feed-video').pause();
+      document.getElementById('btn-share-friends').classList.remove('selected');
+      document.getElementById('btn-repost').classList.remove('selected');
+      document.getElementById('share-modal').style.display = 'block';
+    }
+
+    function closeShareModal() {
+      document.getElementById('share-modal').style.display = 'none';
+      document.getElementById('feed-video').play();
+    }
+
+    function executeShare(actionType) {
+      const cat = activeQueue[queueIndex].category;
+      if (actionType === 'share_to_friends') {
+        userCategoryPreferences[cat] = (userCategoryPreferences[cat] || 0) + 2;
+        document.getElementById('btn-share-friends').classList.add('selected');
+      } else if (actionType === 'repost_to_feed') {
+        userCategoryPreferences[cat] = (userCategoryPreferences[cat] || 0) + 1;
+        document.getElementById('btn-repost').classList.add('selected');
+      }
+
+      logAction(actionType);
+
+      setTimeout(() => {
+        closeShareModal();
+      }, 250);
+    }
+
+    function refreshFeed() {
+      logAction('refresh');
+      sequencePosition++;
+      
+      if (condition === 'Non-Responsive') {
+        activeQueue = [...videoSubsets["Non-Responsive"]];
+      } else if (condition === 'Aligned') {
+        activeQueue = shuffleArray(videoSubsets["Aligned"]);
+      } else {
+        activeQueue = shuffleArray(videoSubsets["Misaligned"]);
+      }
+      queueIndex = 0;
+      viewedIndices.clear();
+      viewHistory = [];
+      
+      loadVideo();
+    }
+
+    function logAction(actionType, probeRating = null) {
+      if (!activeQueue[queueIndex]) return;
+      const currentVid = activeQueue[queueIndex];
+      const videoElem = document.getElementById('feed-video');
+      const dwellTime = ((Date.now() - videoStartTime) / 1000).toFixed(2);
+      const videoDuration = videoElem.duration ? videoElem.duration.toFixed(2) : 0;
+      const percentWatched = videoDuration > 0 ? Math.min(100, ((dwellTime / videoDuration) * 100)).toFixed(1) : 0;
+
+      sessionData.push({
+        participantId: participantId,
+        condition: condition,
+        timestamp: new Date().toISOString(),
+        sequencePosition: sequencePosition,
+        videoId: currentVid.id,
+        author: currentVid.author,
+        category: currentVid.category,
+        action: actionType,
+        watchTimeSeconds: dwellTime,
+        videoDurationSeconds: videoDuration,
+        percentWatched: percentWatched,
+        loopCount: loopCount,
+        algorithmStateScore: userCategoryPreferences[currentVid.category] || 0,
+        perceivedAgencyProbe: probeRating !== null ? probeRating : ""
+      });
+    }
+
+    function nextVideo() {
+      logAction('scroll_next');
+      viewHistory.push(queueIndex);
+      sequencePosition++;
+
+      if (sequencePosition % 10 === 0) {
+        triggerProbe();
+        return;
+      }
+
+      advanceQueue();
+    }
+
+    function triggerProbe() {
+      const videoElem = document.getElementById('feed-video');
+      videoElem.pause();
+      document.getElementById('probe-modal').style.display = 'flex';
+    }
+
+    function submitProbe(rating) {
+      logAction('in_feed_probe_submitted', rating);
+      document.getElementById('probe-modal').style.display = 'none';
+      advanceQueue();
+    }
+
+    function advanceQueue() {
+      if (viewedIndices.size >= activeQueue.length) {
+        if (condition === 'Non-Responsive') {
+          activeQueue = [...videoSubsets["Non-Responsive"]];
+        } else if (condition === 'Aligned') {
+          activeQueue = shuffleArray(videoSubsets["Aligned"]);
+        } else {
+          activeQueue = shuffleArray(videoSubsets["Misaligned"]);
+        }
+        viewedIndices.clear();
+        queueIndex = 0;
+        loadVideo();
+        return;
+      }
+
+      if (condition === 'Non-Responsive') {
+        queueIndex = getNextUnviewedIndex();
+      } else if (condition === 'Aligned') {
+        let sortedCats = Object.keys(userCategoryPreferences).sort((a, b) => userCategoryPreferences[b] - userCategoryPreferences[a]);
+        let targetCat = sortedCats.find(cat => userCategoryPreferences[cat] > 0);
+        let foundIndex = targetCat ? activeQueue.findIndex((v, i) => v.category === targetCat && !viewedIndices.has(i)) : -1;
+        queueIndex = foundIndex !== -1 ? foundIndex : getNextUnviewedIndex();
+      } else if (condition === 'Misaligned') {
+        let sortedCats = Object.keys(userCategoryPreferences).sort((a, b) => userCategoryPreferences[a] - userCategoryPreferences[b]);
+        let targetCat = sortedCats.find(cat => userCategoryPreferences[cat] <= 0);
+        let foundIndex = targetCat ? activeQueue.findIndex((v, i) => v.category === targetCat && !viewedIndices.has(i)) : -1;
+        queueIndex = foundIndex !== -1 ? foundIndex : getNextUnviewedIndex();
+      }
+
+      loadVideo();
+    }
+
+    function prevVideo() {
+      if (viewHistory.length === 0) return;
+      logAction('scroll_previous');
+      sequencePosition++;
+      queueIndex = viewHistory.pop();
+      loadVideo();
+    }
+
+    function getNextUnviewedIndex() {
+      let nextIdx = (queueIndex + 1) % activeQueue.length;
+      let counter = 0;
+      while (viewedIndices.has(nextIdx) && counter < activeQueue.length) {
+        nextIdx = (nextIdx + 1) % activeQueue.length;
+        counter++;
+      }
+      return nextIdx;
+    }
+
+    document.addEventListener('keydown', function(e) {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toUpperCase() === 'E') {
+        endSession('shortcut_end_block');
+      }
+    });
+
+    function buildCSVString() {
+      if (sessionData.length === 0) return "";
+      const headers = Object.keys(sessionData[0]).join(",");
+      const rows = sessionData.map(row =>
+        Object.values(row)
+          .map(val => `"${String(val).replace(/"/g, '""')}"`)
+          .join(",")
+      );
+      return [headers, ...rows].join("\n");
+    }
+
+    function getCSVFilename() {
+      const safeId = (participantId || "Anonymous").replace(/[^a-zA-Z0-9_-]/g, "_");
+      const safeCond = (condition || "Unknown").replace(/[^a-zA-Z0-9_-]/g, "_");
+      const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+      return `${safeId}_Condition_${safeCond}_${stamp}.csv`;
+    }
+
+    async function uploadCSVToCloud(csvContent, filename) {
+      const statusEl = document.getElementById('upload-status');
+
+      if (!csvContent) {
+        statusEl.innerText = "No interaction rows recorded for this block.";
+        return;
+      }
+
+      if (!UPLOAD_ENDPOINT_URL) {
+        statusEl.innerText = "Cloud endpoint not configured yet. Use the backup download button below or set UPLOAD_ENDPOINT_URL.";
+        return;
+      }
+
+      statusEl.innerText = `Uploading ${filename} to cloud folder...`;
+
+      try {
+        await fetch(UPLOAD_ENDPOINT_URL, {
+          method: "POST",
+          mode: "no-cors",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({
+            participantId,
+            condition,
+            filename,
+            csv: csvContent
+          })
+        });
+        statusEl.innerText = `Sent ${filename} to the study cloud folder.`;
+      } catch (err) {
+        console.error("Cloud upload error:", err);
+        statusEl.innerText = "Cloud upload failed. Please use the backup CSV download button below.";
+      }
+    }
+
+    function endSession(reason = 'manual_end_block') {
+      if (sessionEnded) return;
+      sessionEnded = true;
+      clearInterval(timerInterval);
+
+      logAction(reason);
+
+      const videoElem = document.getElementById('feed-video');
+      if (videoElem) videoElem.pause();
+
+      document.getElementById('probe-modal').style.display = 'none';
+      document.getElementById('comments-drawer').style.display = 'none';
+      document.getElementById('share-modal').style.display = 'none';
+      document.getElementById('app-container').style.display = 'none';
+      document.getElementById('end-screen').style.display = 'block';
+
+      const csvContent = buildCSVString();
+      const filename = getCSVFilename();
+      uploadCSVToCloud(csvContent, filename);
+    }
+
+    function downloadCSV() {
+      const csvContent = buildCSVString();
+      if (!csvContent) {
+        alert("No data recorded.");
+        return;
+      }
+      const filename = getCSVFilename();
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", filename);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }
+  </script>
+</body>
+</html>
