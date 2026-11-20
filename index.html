@@ -522,7 +522,6 @@
   </div>
 
   <script>
-    // Replace with your deployed Google Apps Script Web App URL
     const UPLOAD_ENDPOINT_URL = "https://script.google.com/macros/s/AKfycbx4GXqyzlqX7Dn_U7nKXvW8krtbrz-rf0giY-n3bAapjHJ3QVN35fFXjVixMpDtsaEXdg/exec";
     const BLOCK_DURATION_SECONDS = 7 * 60; // 7 minutes
 
@@ -881,6 +880,55 @@
     let timerInterval = null;
     let sessionEnded = false;
 
+    // Background preloader for the upcoming video
+    const preloaderVideo = document.createElement("video");
+    preloaderVideo.preload = "auto";
+    preloaderVideo.muted = true;
+    preloaderVideo.playsInline = true;
+
+    function cleanupActiveVideo() {
+      const videoElem = document.getElementById('feed-video');
+      if (!videoElem) return;
+      videoElem.pause();
+      try {
+        videoElem.currentTime = 0;
+      } catch (e) {
+        // Ignore seek errors before metadata is loaded
+      }
+      videoElem.removeAttribute('src');
+      videoElem.load();
+    }
+
+    function predictNextQueueIndex() {
+      if (!activeQueue.length) return -1;
+      if (viewedIndices.size >= activeQueue.length) return 0;
+
+      if (condition === 'Non-Responsive') {
+        return getNextUnviewedIndex();
+      } else if (condition === 'Aligned') {
+        let sortedCats = Object.keys(userCategoryPreferences).sort((a, b) => userCategoryPreferences[b] - userCategoryPreferences[a]);
+        let targetCat = sortedCats.find(cat => userCategoryPreferences[cat] > 0);
+        let foundIndex = targetCat ? activeQueue.findIndex((v, i) => v.category === targetCat && !viewedIndices.has(i)) : -1;
+        return foundIndex !== -1 ? foundIndex : getNextUnviewedIndex();
+      } else {
+        let sortedCats = Object.keys(userCategoryPreferences).sort((a, b) => userCategoryPreferences[a] - userCategoryPreferences[b]);
+        let targetCat = sortedCats.find(cat => userCategoryPreferences[cat] <= 0);
+        let foundIndex = targetCat ? activeQueue.findIndex((v, i) => v.category === targetCat && !viewedIndices.has(i)) : -1;
+        return foundIndex !== -1 ? foundIndex : getNextUnviewedIndex();
+      }
+    }
+
+    function preloadUpcomingVideo() {
+      if (sessionEnded || !activeQueue.length) return;
+      const nextIdx = predictNextQueueIndex();
+      if (nextIdx < 0 || !activeQueue[nextIdx]) return;
+      const nextSrc = activeQueue[nextIdx].src;
+      if (nextSrc && preloaderVideo.getAttribute('src') !== nextSrc) {
+        preloaderVideo.src = nextSrc;
+        preloaderVideo.load();
+      }
+    }
+
     function shuffleArray(array) {
       let arr = [...array];
       for (let i = arr.length - 1; i > 0; i--) {
@@ -952,6 +1000,8 @@
 
     function loadVideo() {
       if (sessionEnded) return;
+      cleanupActiveVideo();
+
       viewedIndices.add(queueIndex);
       const currentVid = activeQueue[queueIndex];
       const videoElem = document.getElementById('feed-video');
@@ -975,6 +1025,7 @@
 
       videoStartTime = Date.now();
       videoElem.play().catch(e => console.log("Autoplay check:", e));
+      preloadUpcomingVideo();
     }
 
     function generateCommentsForVideo(videoId) {
@@ -1020,6 +1071,7 @@
         userCategoryPreferences[cat] = Math.max(-5, (userCategoryPreferences[cat] || 0) - 3);
         logAction('unlike');
       }
+      preloadUpcomingVideo();
     }
 
     function toggleDislike() {
@@ -1035,6 +1087,7 @@
         userCategoryPreferences[cat] = (userCategoryPreferences[cat] || 0) + 10;
         logAction('undo_not_interested');
       }
+      preloadUpcomingVideo();
     }
 
     function toggleSave() {
@@ -1048,6 +1101,7 @@
         document.getElementById('save-btn').classList.remove('active-generic');
         logAction('unsave');
       }
+      preloadUpcomingVideo();
     }
 
     function toggleFollow() {
@@ -1066,6 +1120,7 @@
         followBadge.innerText = '+';
         logAction('unfollow');
       }
+      preloadUpcomingVideo();
     }
 
     function openComments() {
@@ -1078,6 +1133,7 @@
       logAction('open_comments');
       renderComments();
       document.getElementById('comments-drawer').style.display = 'flex';
+      preloadUpcomingVideo();
     }
 
     function closeComments() {
@@ -1118,6 +1174,7 @@
         logAction('unlike_comment');
       }
       renderComments();
+      preloadUpcomingVideo();
     }
 
     function openShareModal() {
@@ -1143,6 +1200,7 @@
       }
 
       logAction(actionType);
+      preloadUpcomingVideo();
 
       setTimeout(() => {
         closeShareModal();
@@ -1333,8 +1391,9 @@
 
       logAction(reason);
 
-      const videoElem = document.getElementById('feed-video');
-      if (videoElem) videoElem.pause();
+      cleanupActiveVideo();
+      preloaderVideo.removeAttribute('src');
+      preloaderVideo.load();
 
       document.getElementById('probe-modal').style.display = 'none';
       document.getElementById('comments-drawer').style.display = 'none';
